@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Admin - Decentralized Voting Platform</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.umd.min.js"></script>
+    <style>
+        :root {
+            --primary: #6B46C1;
+            --secondary: #00F7FF;
+            --background: #1A103D;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --text: #F7FAFC;
+            --success: #10B981;
+            --error: #EF4444;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, var(--background) 0%, #2A1A5E 100%);
+            background-attachment: fixed;
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px;
+            animation: gradientShift 15s ease infinite;
+        }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 40px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        #connectWallet {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            background: var(--primary);
+            border: 2px solid var(--secondary);
+            border-radius: 50px;
+            color: var(--text);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #connectWallet:hover {
+            background: var(--secondary);
+            color: var(--background);
+            transform: translateY(-2px);
+        }
+        #walletStatus {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--error);
+        }
+        #walletStatus.connected {
+            background: var(--success);
+        }
+        .admin-section, .login-section {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 24px;
+            backdrop-filter: blur(10px);
+            width: 100%;
+            max-width: 600px;
+        }
+        .admin-section h2, .login-section h2 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+        }
+        .admin-form, .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .admin-form input, .login-form input {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1rem;
+        }
+        .admin-form button, .login-form button {
+            padding: 12px;
+            background: var(--primary);
+            border: none;
+            border-radius: 8px;
+            color: var(--text);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .admin-form button:hover, .login-form button:hover {
+            background: var(--secondary);
+            color: var(--background);
+        }
+        #notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 16px 24px;
+            border-radius: 8px;
+            color: var(--text);
+            font-weight: 500;
+            display: none;
+            max-width: 300px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        #notification.success {
+            background: var(--success);
+        }
+        #notification.error {
+            background: var(--error);
+        }
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 5px solid var(--secondary);
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 12px 24px;
+            background: var(--primary);
+            border: 2px solid var(--secondary);
+            border-radius: 50px;
+            color: var(--text);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .back-btn:hover {
+            background: var(--secondary);
+            color: var(--background);
+            transform: translateY(-2px);
+        }
+        .hidden {
+            display: none;
+        }
+        .owner-section {
+            background: var(--card-bg);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 24px;
+            backdrop-filter: blur(10px);
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+        .owner-section p {
+            font-size: 1.1rem;
+        }
+        @media (max-width: 768px) {
+            h1 { font-size: 2rem; }
+            #connectWallet, .back-btn { top: 10px; right: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <button class="back-btn" onclick="window.location.href='index.html'">Back</button>
+    <button id="connectWallet" class="hidden">
+        <span id="walletStatus"></span>
+        <span id="walletText">Connect Wallet</span>
+    </button>
+    <div id="loginContainer">
+        <div class="login-section">
+            <h2>Admin Login</h2>
+            <div class="login-form">
+                <input type="text" id="adminName" placeholder="Admin Name">
+                <input type="password" id="adminPassword" placeholder="Password">
+                <button onclick="login()">Login</button>
+            </div>
+        </div>
+    </div>
+    <div id="adminContainer" class="hidden">
+        <h1>Admin Panel</h1>
+        <div class="owner-section" id="ownerSection">
+            <p>Contract Owner: <span id="ownerAddress">Loading...</span></p>
+            <p>Connected Wallet: <span id="connectedWallet">Not connected</span></p>
+        </div>
+        <div class="admin-section">
+            <h2>Create Election</h2>
+            <div class="admin-form">
+                <input type="text" id="electionName" placeholder="Election Name" value="General Election 2025">
+                <input type="number" id="electionDuration" placeholder="Duration (minutes)" min="1" value="10">
+                <input type="text" id="candidateNames" placeholder="Candidate names (comma-separated)" value="Candidate1,Candidate2,Candidate3">
+                <button onclick="createElection()">Create Election</button>
+                <button onclick="endElection()">End Current Election</button>
+            </div>
+        </div>
+    </div>
+    <div id="notification"></div>
+    <div id="loading">
+        <div class="spinner"></div>
+    </div>
+    <script>
+        const contractAddress = "0xD933312B5969586dBBD8b2cE387A0cf2739159Fe"; // Deployed contract address
+        const contractABI = [
+            {
+                "inputs": [],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
+                "inputs": [],
+                "name": "electionActive",
+                "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "electionName",
+                "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "owner",
+                "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "votingEndTime",
+                "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    { "internalType": "string", "name": "_electionName", "type": "string" },
+                    { "internalType": "string[]", "name": "_candidateNames", "type": "string[]" },
+                    { "internalType": "uint256", "name": "_durationInMinutes", "type": "uint256" }
+                ],
+                "name": "createElection",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "endElection",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    { "internalType": "string", "name": "_name", "type": "string" }
+                ],
+                "name": "registerCandidate",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    { "internalType": "uint256", "name": "_candidateIndex", "type": "uint256" }
+                ],
+                "name": "vote",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getAllVotesOfCandiates",
+                "outputs": [
+                    {
+                        "components": [
+                            { "internalType": "string", "name": "name", "type": "string" },
+                            { "internalType": "uint256", "name": "voteCount", "type": "uint256" },
+                            { "internalType": "address", "name": "walletAddress", "type": "address" }
+                        ],
+                        "internalType": "struct Voting.Candidate[]",
+                        "name": "",
+                        "type": "tuple[]"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getElectionDetails",
+                "outputs": [
+                    { "internalType": "string", "name": "", "type": "string" }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getVotingStatus",
+                "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getRemainingTime",
+                "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getWinner",
+                "outputs": [
+                    { "internalType": "string", "name": "winnerName", "type": "string" },
+                    { "internalType": "uint256", "name": "winnerVotes", "type": "uint256" }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "isOwner",
+                "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+                "name": "hasVoted",
+                "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+                "name": "isCandidate",
+                "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ];
+
+        let contract;
+        let signer;
+        let isAdmin = false;
+
+        // Hardcoded admin credentials (for demonstration only)
+        const ADMIN_NAME = "admin";
+        const ADMIN_PASSWORD = "123";
+
+        function showNotification(message, type) {
+            const notification = document.getElementById("notification");
+            notification.textContent = message;
+            notification.className = type;
+            notification.style.display = "block";
+            setTimeout(() => {
+                notification.style.display = "none";
+            }, 5000);
+        }
+
+        function toggleLoading(show) {
+            document.getElementById("loading").style.display = show ? "flex" : "none";
+        }
+
+        function login() {
+            const name = document.getElementById("adminName").value.trim();
+            const password = document.getElementById("adminPassword").value.trim();
+
+            if (name === ADMIN_NAME && password === ADMIN_PASSWORD) {
+                document.getElementById("loginContainer").classList.add("hidden");
+                document.getElementById("adminContainer").classList.remove("hidden");
+                document.getElementById("connectWallet").classList.remove("hidden");
+                showNotification("Login successful! Please connect your wallet.", "success");
+                connect();
+            } else {
+                showNotification("Invalid name or password.", "error");
+            }
+        }
+
+        async function connect() {
+            toggleLoading(true);
+            try {
+                if (!window.ethereum) {
+                    throw new Error("Please install MetaMask!");
+                }
+
+                const provider = new ethers.BrowserProvider(window.ethereum);
+                await provider.send("eth_requestAccounts", []);
+                signer = await provider.getSigner();
+                contract = new ethers.Contract(contractAddress, contractABI, signer);
+
+                const address = await signer.getAddress();
+                document.getElementById("walletText").textContent = `Connected: ${address.slice(0, 6)}...${address.slice(-4)}`;
+                document.getElementById("walletStatus").classList.add("connected");
+
+                // Display the connected wallet address
+                document.getElementById("connectedWallet").textContent = address;
+
+                // Fetch and display the owner address
+                const ownerAddress = await contract.owner();
+                document.getElementById("ownerAddress").textContent = ownerAddress;
+
+                isAdmin = await contract.isOwner();
+                if (!isAdmin) {
+                    showNotification(`Access Denied: Connected wallet (${address}) is not the contract owner (${ownerAddress}).`, "error");
+                    setTimeout(() => window.location.href = "index.html", 5000); // Increased timeout for debugging
+                    return;
+                }
+
+                showNotification("Wallet connected successfully! You are the contract owner.", "success");
+            } catch (error) {
+                showNotification(`Failed to connect wallet: ${error.message}`, "error");
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        async function createElection() {
+            toggleLoading(true);
+            try {
+                const electionName = document.getElementById("electionName").value.trim();
+                const duration = document.getElementById("electionDuration").value;
+                const names = document.getElementById("candidateNames").value.split(",").map(name => name.trim()).filter(name => name);
+
+                if (!electionName) {
+                    showNotification("Please provide an election name.", "error");
+                    toggleLoading(false);
+                    return;
+                }
+                if (!duration || duration <= 0) {
+                    showNotification("Please provide a valid duration greater than 0.", "error");
+                    toggleLoading(false);
+                    return;
+                }
+                if (names.length < 2) {
+                    showNotification("Please provide at least two candidates.", "error");
+                    toggleLoading(false);
+                    return;
+                }
+
+                const tx = await contract.createElection(electionName, names, duration);
+                await tx.wait();
+                showNotification("Election created successfully! Users can now vote.", "success");
+            } catch (error) {
+                let errorMessage = "Failed to create election: ";
+                if (error.reason) {
+                    errorMessage += error.reason;
+                } else if (error.message) {
+                    errorMessage += error.message;
+                } else {
+                    errorMessage += "Unknown error";
+                }
+                showNotification(errorMessage, "error");
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        async function endElection() {
+            toggleLoading(true);
+            try {
+                const tx = await contract.endElection();
+                await tx.wait();
+                showNotification("Election ended successfully!", "success");
+            } catch (error) {
+                let errorMessage = "Failed to end election: ";
+                if (error.reason) {
+                    errorMessage += error.reason;
+                } else if (error.message) {
+                    errorMessage += error.message;
+                } else {
+                    errorMessage += "Unknown error";
+                }
+                showNotification(errorMessage, "error");
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        document.getElementById("connectWallet").addEventListener("click", connect);
+    </script>
+</body>
+</html>

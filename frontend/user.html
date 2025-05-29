@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>User - Decentralized Voting Platform</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.8.1/dist/ethers.umd.min.js"></script>
+    <style>
+        :root {
+            --primary: #6B46C1;
+            --secondary: #00F7FF;
+            --background: #1A103D;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --text: #F7FAFC;
+            --success: #10B981;
+            --error: #EF4444;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, var(--background) 0%, #2A1A5E 100%);
+            background-attachment: fixed;
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px;
+            animation: gradientShift 15s ease infinite;
+        }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 40px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        #connectWallet {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            background: var(--primary);
+            border: 2px solid var(--secondary);
+            border-radius: 50px;
+            color: var(--text);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #connectWallet:hover {
+            background: var(--secondary);
+            color: var(--background);
+            transform: translateY(-2px);
+        }
+        #walletStatus {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--error);
+        }
+        #walletStatus.connected {
+            background: var(--success);
+        }
+        .candidates-section, .register-section {
+            width: 100%;
+            max-width: 1200px;
+            margin-bottom: 40px;
+        }
+        .candidates-section h2, .register-section h2 {
+            font-size: 2rem;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        #electionName {
+            font-size: 1.5rem;
+            margin-bottom: 24px;
+            text-align: center;
+            background: var(--card-bg);
+            padding: 12px;
+            border-radius: 8px;
+        }
+        #candidatesContainer {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+        }
+        .candidate-card {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+        .candidate-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+            border-color: var(--secondary);
+        }
+        .candidate-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 12px;
+        }
+        .candidate-card .description {
+            font-size: 1rem;
+            opacity: 0.7;
+            margin-bottom: 12px;
+        }
+        .candidate-card p {
+            font-size: 1.1rem;
+            opacity: 0.8;
+            margin-bottom: 16px;
+        }
+        .vote-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            color: var(--text);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            position: relative;
+        }
+        .vote-btn:hover {
+            filter: brightness(1.2);
+            transform: scale(1.05);
+        }
+        .vote-btn:disabled {
+            background: grey;
+            cursor: not-allowed;
+            filter: none;
+        }
+        .vote-btn::after {
+            content: "Click to cast your vote";
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--card-bg);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .vote-btn:hover::after {
+            opacity: 0.9;
+        }
+        .vote-btn:disabled::after {
+            content: "Cannot vote: Already voted or voting ended";
+            opacity: 0.9;
+        }
+        .register-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .register-form input {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 1rem;
+        }
+        .register-form button {
+            padding: 12px;
+            background: var(--primary);
+            border: none;
+            border-radius: 8px;
+            color: var(--text);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .register-form button:hover {
+            background: var(--secondary);
+            color: var(--background);
+        }
+        .status-container {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        .status-container p {
+            margin: 12px 0;
+            font-size: 1.1rem;
+        }
+        .progress-bar {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+        .progress {
+            height: 100%;
+            background: var(--secondary);
+            transition: width 0.3s ease;
+        }
+        #winner {
+            font-size: 1.8rem;
+            font-weight: 700;
+            padding: 16px 32px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            margin: 20px 0;
+            display: none;
+        }
+        #declareWinner {
+            padding: 14px 32px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border: none;
+            border-radius: 50px;
+            color: var(--text);
+            font-weight: 600;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        #declareWinner:hover {
+            filter: brightness(1.2);
+            transform: translateY(-2px);
+        }
+        #notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 16px 24px;
+            border-radius: 8px;
+            color: var(--text);
+            font-weight: 500;
+            display: none;
+            max-width: 300px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        #notification.success {
+            background: var(--success);
+        }
+        #notification.error {
+            background: var(--error);
+        }
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 5px solid var(--secondary);
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 12px 24px;
+            background: var(--primary);
+            border: 2px solid var(--secondary);
+            border-radius: 50px;
+            color: var(--text);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .back-btn:hover {
+            background: var(--secondary);
+            color: var(--background);
+            transform: translateY(-2px);
+        }
+        @media (max-width: 768px) {
+            h1 { font-size: 2rem; }
+            .candidates-section h2, .register-section h2 { font-size: 1.5rem; }
+            #candidatesContainer { grid-template-columns: 1fr; }
+            .candidate-card { min-width: unset; }
+            #connectWallet, .back-btn { top: 10px; right: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <button class="back-btn" onclick="window.location.href='index.html'">Back</button>
+    <button id="connectWallet">
+        <span id="walletStatus"></span>
+        <span id="walletText">Connect Wallet</span>
+    </button>
+    <h1>User Voting</h1>
+    <div class="register-section">
+        <h2>Register as Candidate</h2>
+        <div class="register-form">
+            <input type="text" id="candidateName" placeholder="Your candidate name">
+            <button onclick="registerCandidate()">Register</button>
+        </div>
+    </div>
+    <div class="candidates-section">
+        <div id="electionName">Loading...</div>
+        <h2>Candidates to Vote For</h2>
+        <p style="text-align: center; opacity: 0.8; margin-bottom: 16px;">Note: Each account can vote only once.</p>
+        <div id="candidatesContainer"></div>
+    </div>
+    <div class="status-container">
+        <p><strong>Voting Status:</strong> <span id="votingStatus">Loading...</span></p>
+        <p><strong>Your Voting Status:</strong> <span id="userVotingStatus">Loading...</span></p>
+        <p><strong>Time Left:</strong> <span id="timeLeft">Loading...</span></p>
+        <div class="progress-bar">
+            <div class="progress" id="progress"></div>
+        </div>
+    </div>
+    <p id="winner"></p>
+    <button id="declareWinner" onclick="declareWinner()">Declare Winner</button>
+    <div id="notification"></div>
+    <div id="loading">
+        <div class="spinner"></div>
+    </div>
+    <script>
+        const contractAddress = "0xD933312B5969586dBBD8b2cE387A0cf2739159Fe"; // Replace with the deployed contract address
+        const contractABI = [
+            {
+                "inputs": [],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
+                "inputs": [],
+                "name": "electionActive",
+                "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "electionName",
+                "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "owner",
+                "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "votingEndTime",
+                "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    { "internalType": "string", "name": "_electionName", "type": "string" },
+                    { "internalType": "string[]", "name": "_candidateNames", "type": "string[]" },
+                    { "internalType": "uint256", "name": "_durationInMinutes", "type": "uint256" }
+                ],
+                "name": "createElection",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "endElection",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    { "internalType": "string", "name": "_name", "type": "string" }
+                ],
+                "name": "registerCandidate",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    { "internalType": "uint256", "name": "_candidateIndex", "type": "uint256" }
+                ],
+                "name": "vote",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getAllVotesOfCandiates",
+                "outputs": [
+                    {
+                        "components": [
+                            { "internalType": "string", "name": "name", "type": "string" },
+                            { "internalType": "uint256", "name": "voteCount", "type": "uint256" },
+                            { "internalType": "address", "name": "walletAddress", "type": "address" }
+                        ],
+                        "internalType": "struct Voting.Candidate[]",
+                        "name": "",
+                        "type": "tuple[]"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getElectionDetails",
+                "outputs": [
+                    { "internalType": "string", "name": "", "type": "string" }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getVotingStatus",
+                "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getRemainingTime",
+                "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "getWinner",
+                "outputs": [
+                    { "internalType": "string", "name": "winnerName", "type": "string" },
+                    { "internalType": "uint256", "name": "winnerVotes", "type": "uint256" }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "isOwner",
+                "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+                "name": "hasVoted",
+                "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+                "name": "isCandidate",
+                "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ];
+
+        let contract;
+        let signer;
+        let voterAddress;
+        let hasVoted = false;
+        let totalTime = 0;
+
+        function showNotification(message, type) {
+            const notification = document.getElementById("notification");
+            notification.textContent = message;
+            notification.className = type;
+            notification.style.display = "block";
+            setTimeout(() => {
+                notification.style.display = "none";
+            }, 3000);
+        }
+
+        function toggleLoading(show) {
+            document.getElementById("loading").style.display = show ? "flex" : "none";
+        }
+
+        async function connect() {
+            toggleLoading(true);
+            try {
+                if (window.ethereum) {
+                    const provider = new ethers.BrowserProvider(window.ethereum);
+                    await provider.send("eth_requestAccounts", []);
+                    signer = await provider.getSigner();
+                    contract = new ethers.Contract(contractAddress, contractABI, signer);
+
+                    voterAddress = await signer.getAddress();
+                    document.getElementById("walletText").textContent = `Connected: ${voterAddress.slice(0, 6)}...${voterAddress.slice(-4)}`;
+                    document.getElementById("walletStatus").classList.add("connected");
+
+                    // Check if the voter has already voted
+                    hasVoted = await contract.hasVoted(voterAddress);
+                    if (hasVoted) {
+                        showNotification("You have already voted! Each account can vote only once.", "error");
+                        document.getElementById("userVotingStatus").textContent = "Voted";
+                    } else {
+                        document.getElementById("userVotingStatus").textContent = "Not Voted";
+                    }
+
+                    await loadElectionDetails();
+                    await loadCandidates();
+                    await updateStatus();
+                    showNotification("Wallet connected successfully!", "success");
+                } else {
+                    showNotification("Please install MetaMask!", "error");
+                }
+            } catch (error) {
+                showNotification("Failed to connect wallet: " + error.message, "error");
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        async function loadElectionDetails() {
+            try {
+                const electionDetails = await contract.getElectionDetails();
+                document.getElementById("electionName").textContent = electionDetails || "No Election Set";
+            } catch (error) {
+                showNotification("Failed to load election details: " + error.message, "error");
+                document.getElementById("electionName").textContent = "Error Loading Election";
+            }
+        }
+
+        async function loadCandidates() {
+            toggleLoading(true);
+            try {
+                const candidates = await contract.getAllVotesOfCandiates();
+                const votingActive = await contract.getVotingStatus();
+                const container = document.getElementById("candidatesContainer");
+                container.innerHTML = "";
+
+                if (candidates.length === 0) {
+                    container.innerHTML = "<p>No candidates available. Please wait for the admin to create an election.</p>";
+                    return;
+                }
+
+                candidates.forEach((candidate, index) => {
+                    const card = document.createElement("div");
+                    card.className = "candidate-card";
+                    card.innerHTML = `
+                        <h3>${candidate.name}</h3>
+                        <div class="description">Candidate for Election</div>
+                        <p>Votes: ${candidate.voteCount}</p>
+                        <button class="vote-btn" onclick="vote(${index})" ${!votingActive || hasVoted ? "disabled" : ""}>Vote</button>
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (error) {
+                showNotification("Failed to load candidates: " + error.message, "error");
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        async function registerCandidate() {
+            toggleLoading(true);
+            try {
+                const name = document.getElementById("candidateName").value.trim();
+                if (!name) {
+                    showNotification("Please provide a candidate name.", "error");
+                    toggleLoading(false);
+                    return;
+                }
+
+                const tx = await contract.registerCandidate(name);
+                await tx.wait();
+                showNotification("Successfully registered as candidate!", "success");
+                await loadCandidates();
+            } catch (error) {
+                showNotification("Failed to register candidate: " + error.message, "error");
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        async function vote(index) {
+            toggleLoading(true);
+            try {
+                const alreadyVoted = await contract.hasVoted(voterAddress);
+                if (alreadyVoted) {
+                    showNotification("You have already voted! Each account can vote only once.", "error");
+                    toggleLoading(false);
+                    return;
+                }
+
+                const status = await contract.getVotingStatus();
+                if (!status) {
+                    showNotification("Voting is not active.", "error");
+                    toggleLoading(false);
+                    return;
+                }
+
+                const tx = await contract.vote(index);
+                await tx.wait();
+
+                hasVoted = true;
+                document.getElementById("userVotingStatus").textContent = "Voted";
+
+                showNotification("Vote submitted successfully!", "success");
+                await loadCandidates();
+            } catch (error) {
+                let errorMessage = "Voting failed: ";
+                if (error.reason) {
+                    errorMessage += error.reason;
+                } else if (error.message) {
+                    errorMessage += error.message;
+                } else {
+                    errorMessage += "Unknown error";
+                }
+                showNotification(errorMessage, "error");
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        async function updateStatus() {
+            try {
+                const status = await contract.getVotingStatus();
+                document.getElementById("votingStatus").textContent = status ? "Active" : "Ended";
+
+                const time = await contract.getRemainingTime();
+                document.getElementById("timeLeft").textContent = `${Math.floor(time / 60)}m ${time % 60}s`;
+
+                if (!totalTime) totalTime = time;
+                const progress = totalTime ? (totalTime - time) / totalTime * 100 : 0;
+                document.getElementById("progress").style.width = `${progress}%`;
+
+                if (status) setTimeout(updateStatus, 1000);
+            } catch (error) {
+                showNotification("Status update error: " + error.message, "error");
+            }
+        }
+
+        async function declareWinner() {
+            toggleLoading(true);
+            try {
+                const status = await contract.getVotingStatus();
+                if (status) {
+                    showNotification("Voting is still active. Cannot declare winner yet.", "error");
+                    toggleLoading(false);
+                    return;
+                }
+
+                const [winnerName, voteCount] = await contract.getWinner();
+                if (!winnerName) {
+                    showNotification("No votes recorded yet.", "error");
+                    toggleLoading(false);
+                    return;
+                }
+                const winnerElement = document.getElementById("winner");
+                winnerElement.textContent = `Winner: ${winnerName} (${voteCount} votes)`;
+                winnerElement.style.display = "block";
+                showNotification(`Winner: ${winnerName} with ${voteCount} votes!`, "success");
+            } catch (error) {
+                showNotification("Failed to declare winner: " + error.message, "error");
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        document.getElementById("connectWallet").addEventListener("click", connect);
+        connect();
+    </script>
+</body>
+</html>

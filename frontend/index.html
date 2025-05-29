@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Decentralized Voting Platform</title>
+    <style>
+        :root {
+            --primary: #6B46C1;
+            --secondary: #00F7FF;
+            --background: #1A103D;
+            --text: #F7FAFC;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--background) 0%, #2A1A5E 100%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 40px;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .nav-btn {
+            padding: 12px 24px;
+            background: var(--primary);
+            border: 2px solid var(--secondary);
+            border-radius: 50px;
+            color: var(--text);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+        .nav-btn:hover {
+            background: var(--secondary);
+            color: var(--background);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <h1>Decentralized Voting Platform</h1>
+    <button class="nav-btn" onclick="window.location.href='admin.html'">Admin Panel</button>
+    <button class="nav-btn" onclick="window.location.href='user.html'">User Voting</button>
+</body>
+</html>
